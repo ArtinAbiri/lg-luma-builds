@@ -1,0 +1,77 @@
+name: Publish
+run-name: "Publish · ${{ github.event.head_commit.message }}"
+
+# The private source repository pushes each finished build to the "drop" branch.
+# This checks it and publishes it as a release; "drop" is overwritten every time,
+# so old app files don't pile up in this repository's history.
+
+on:
+  push:
+    branches: [drop]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: drop
+          persist-credentials: false
+
+      - name: Check the build
+        id: check
+        run: |
+          set -euo pipefail
+          tag=$(jq -r .tag release.json)
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Bad tag $tag"; exit 1; }
+          ipk="com.ecklf.luma_${tag#v}_arm.ipk"
+          [ -f "$ipk" ] || { echo "::error::Missing $ipk"; exit 1; }
+          sha256sum -c sha256sums
+          feed() { jq -r ".packages[0].manifest.$1" repo.json; }
+          [ "$(feed ipkHash.sha256)" = "$(sha256sum "$ipk" | cut -d' ' -f1)" ] &&
+            [ "$(feed ipkSize)" = "$(stat -c %s "$ipk")" ] ||
+            { echo "::error::repo.json doesn't match the app file"; exit 1; }
+          [ "$(feed ipkUrl)" = "https://github.com/$GITHUB_REPOSITORY/releases/download/$tag/$ipk" ] ||
+            { echo "::error::Unexpected address $(feed ipkUrl)"; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ipk=$ipk" >> "$GITHUB_OUTPUT"
+
+      - name: Create the release
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+          IPK: ${{ steps.check.outputs.ipk }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG is already published." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Only a newer build becomes "latest", which is what the TV checks.
+          current=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          latest=true
+          if [ -n "$current" ] && [ "$(printf '%s\n%s\n' "$current" "$TAG" | sort -V | tail -n 1)" != "$TAG" ]; then
+            latest=false
+          fi
+          jq -r .notes release.json > "$RUNNER_TEMP/notes.md"
+          gh release create "$TAG" --target main --title "$(jq -r .title release.json)" \
+            --notes-file "$RUNNER_TEMP/notes.md" --latest="$latest" \
+            "$IPK" repo.json sha256sums app-icon-large.png description.html
+          echo "Published $TAG (latest: $latest)" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the last 10 releases
+        run: |
+          set -euo pipefail
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[10:][] | .tagName' |
+            while read -r tag; do gh release delete "$tag" --yes --cleanup-tag; done
