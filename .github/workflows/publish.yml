@@ -1,9 +1,11 @@
 name: Publish
 run-name: "Publish · ${{ github.event.head_commit.message }}"
 
-# The private source repository pushes each finished build to the "drop" branch.
-# This checks it and publishes it as a release; "drop" is overwritten every time,
-# so old app files don't pile up in this repository's history.
+# The private source repository pushes each finished build to the "drop" branch, as
+# one commit on top of main that adds the files under release/ (GitHub runs this
+# workflow from the pushed commit). This checks the files and publishes them as a
+# release; "drop" is overwritten every time, so old app files don't pile up in this
+# repository's history.
 
 on:
   push:
@@ -26,11 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: drop
           persist-credentials: false
 
       - name: Check the build
         id: check
+        working-directory: release
         run: |
           set -euo pipefail
           tag=$(jq -r .tag release.json)
@@ -48,6 +50,7 @@ jobs:
           echo "ipk=$ipk" >> "$GITHUB_OUTPUT"
 
       - name: Create the release
+        working-directory: release
         env:
           TAG: ${{ steps.check.outputs.tag }}
           IPK: ${{ steps.check.outputs.ipk }}
