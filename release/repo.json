@@ -1,0 +1,32 @@
+{
+  "paging": {
+    "page": 1,
+    "count": 1,
+    "maxPage": 1,
+    "itemsTotal": 1
+  },
+  "packages": [
+    {
+      "id": "com.ecklf.luma",
+      "title": "Luma",
+      "shortDescription": "A remote-first native webOS launcher.",
+      "fullDescriptionUrl": "https://github.com/ArtinAbiri/lg-luma-builds/releases/download/v3.8.1054/description.html",
+      "iconUri": "https://github.com/ArtinAbiri/lg-luma-builds/releases/download/v3.8.1054/app-icon-large.png",
+      "manifest": {
+        "id": "com.ecklf.luma",
+        "version": "3.8.1054",
+        "type": "native",
+        "title": "Luma",
+        "appDescription": "A remote-first native webOS launcher.",
+        "iconUri": "https://github.com/ArtinAbiri/lg-luma-builds/releases/download/v3.8.1054/app-icon-large.png",
+        "sourceUrl": "https://github.com/ArtinAbiri/lg-luma-builds",
+        "rootRequired": true,
+        "ipkUrl": "https://github.com/ArtinAbiri/lg-luma-builds/releases/download/v3.8.1054/com.ecklf.luma_3.8.1054_arm.ipk",
+        "ipkHash": {
+          "sha256": "aa2fac55f66d6c2078b577f1527a2efff0e128cd0596c4e59b8a8583adbdf437"
+        },
+        "ipkSize": 55494638
+      }
+    }
+  ]
+}
